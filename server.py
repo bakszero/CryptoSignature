@@ -35,42 +35,38 @@ def power(b, e, m):
 
     return result
 
-def modulo_inv(a, n):
-
-    dividend = copy.deepcopy(n);
-    divisor = copy.deepcopy(a);
-    rem = -1;
-    step = 0;
-
-    p=[]
-    q=[]
-
-    while(1):
-        r = dividend % divisor
-        if r != 0:
-            rem = copy.deepcopy(r)
-            q.append(int(dividend) // int(divisor))
-
-            dividend = copy.deepcopy(divisor)
-            divisor = copy.deepcopy(r)
-
-            if step == 0:
-                p.append(0)
-            elif step == 1:
-                p.append(1)
-            else:
-                p.append(p[step-2] + ((-p[step-1]*q[step-2]) % n))
-        else:
-            if rem != 1:
-                return False
-            else:
-                p.append(p[step-2] + ((-p[step-1]*q[step-2]) % n))
-                step += 1
-                p.append(p[step-2] + ((-p[step-1]*q[step-2]) % n))
-
-                return p[-1]
-
-        step += 1        
+def modulo_inv(a, m) :
+    m0 = m
+    y = 0
+    x = 1
+ 
+    if (m == 1) :
+        return 0
+ 
+    while (a > 1) :
+ 
+        # q is quotient
+        q = a // m
+ 
+        t = m
+ 
+        # m is remainder now, process
+        # same as Euclid's algo
+        m = a % m
+        a = t
+        t = y
+ 
+        # Update x and y
+        y = x - q * y
+        x = t
+ 
+ 
+    # Make x positive
+    if (x < 0) :
+        x = x + m0
+ 
+    return x
+        
 
 class MessageStruct():
 
@@ -152,24 +148,34 @@ class SigVerifier:
 
     def compute_r_star(self, alpha, s_dash, y, e_dash, p):
 
-        temp_1 = power(y, e_dash, p)
+        temp_1 = modulo_inv(y,p)
 
         temp_2 = power(alpha, s_dash, p)
 
-        r_star = ( modulo_inv(temp_1,p) * temp_2 ) % p
+        r_star = ( power(temp_1, e_dash, p) * temp_2 ) % p
 
         print (" r star is : ", r_star)
         return r_star 
 
 
-    def compute_hash(self, m, r_star):
+    def compute_hash(self, m, r_star, p):
+
+        #md = ''.join(format(ord(x), 'b') for x in m)
+        #concat_msg = md + str(int('{0:b}'.format(r_star),2 ) )      #print ("concat_m: ", concat_m)
+
+        #Get hash
         sha1 = hashlib.sha1()
         sha1.update(m.encode())
         sha1.update(str(r_star).encode())
-        hashed_message = sha1.hexdigest()
-        print ("Hash :", int(hashed_message, 16))
+        #sha1.update(str(concat_msg).encode())
 
-        return int(hashed_message, 16)
+       # sha1 = hashlib.sha1()
+       # sha1.update(m.encode())
+       # sha1.update(str(r_star).encode())
+        hashed_message = sha1.hexdigest()
+        print ("Hash :", int(hashed_message, 16) % p)
+
+        return int(hashed_message, 16) % p
 
 
 
@@ -226,7 +232,7 @@ def main():
     #Verify
     verifier = SigVerifier()
     r_star = verifier.compute_r_star(alpha_server, s_dash_server, y_server, e_dash_server, p_server )
-    hash_val = verifier.compute_hash(message, r_star)
+    hash_val = verifier.compute_hash(message, r_star, p_server)
 
     print ("e_dash : ", e_dash_server)
 
