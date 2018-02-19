@@ -31,12 +31,14 @@ def power(b, e, m):
         return 0
     #perform RSM
     result = 1
-    b = b%m
+    #b = b%m
     while(e>0):
         if (e%2==1):
             result = ((result*b) % m)
-        e = e // 2
+
         b = ((b*b)%m)
+        e = e // 2
+
 
     return result
 
@@ -350,25 +352,31 @@ class KeySignature:
         print("s : ", s)
         return s
 
-
-    def compute_r_dash(self, r, alpha, y, p, q):
-
+    def compute_u(self, alpha, p, q):
         while(1):
-            #select 2 random secret integers
             u = 1 + random.getrandbits(20)%(q)
-            v = 1 + random.getrandbits(20)%(q)
-
             temp = power(alpha, u, p)
 
             if (modulo_inv(temp,p) == False):
                 continue
+            else:
+                print ("u : ", u)
+                return u
 
-            r_dash = ( (r%p) * (power(y,v,p)) * modulo_inv(temp,p) ) % p
 
-            print ("u : ", u)
-            print ("v : ", v)
-            print ("r' : ", r_dash)
-            return u, v, r_dash
+
+
+    def compute_r_dash(self, u, v, r, alpha, y, p, q):
+
+        #v = 1 + random.getrandbits(20)%(q)
+
+        temp = power(alpha, u, p)
+
+        r_dash = ( (r%p) * (power(y,v,p)) * modulo_inv(temp,p) ) % p
+
+        print ("v : ", v)
+        print ("r' : ", r_dash)
+        return v, r_dash
 
 
 
@@ -399,11 +407,22 @@ def main():
     print ("m : ", m)
     e = keysign.compute_hash(m, r)
     s_sign = keysign.compute_s(a, e, k, q)
-    u, v, r_dash = keysign.compute_r_dash(r, alpha, y, p, q)
-    e_dash = keysign.compute_hash(m, r_dash)
-    print ("e-v : ", e-v)
-    s_dash = s_sign- u
-    print ("s-u : ",s_sign-u )
+    u = keysign.compute_u(alpha, p, q)
+    v_list= [x for x in range(1, q)]
+    while(len(v_list) > 0):
+        v = random.choice(v_list)
+        r_dash = keysign.compute_r_dash(u, v, r, alpha, y, p, q)
+        e_dash = keysign.compute_hash(m, r_dash)
+        print ("e' : ", e_dash)
+        print ("e-v : ", e-v)
+
+        if (e_dash != e-v and len(v_list)>1):
+            v_list.remove(v)
+            continue
+
+        s_dash = s_sign- u
+        print ("s' = s-u : ",s_sign-u )
+        break
 
     #Send signature
     signature = MessageStruct()
