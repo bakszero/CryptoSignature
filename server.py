@@ -4,13 +4,15 @@ import time
 import json
 import hashlib
 import copy
+import pprint
 # create a socket object
 serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
 
 # get local machine name
 host = socket.gethostname()                           
 
-port = 9977
+port = 9978
+serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 # bind to the port
 serversocket.bind((host, port))                                  
@@ -154,7 +156,7 @@ class SigVerifier:
 
         temp_2 = power(alpha, s_dash, p)
 
-        r_star = ( temp_1 * temp_2 ) % p
+        r_star = ( modulo_inv(temp_1,p) * temp_2 ) % p
 
         print (" r star is : ", r_star)
         return r_star 
@@ -162,8 +164,8 @@ class SigVerifier:
 
     def compute_hash(self, m, r_star):
         sha1 = hashlib.sha1()
-        sha1.update(m.encode('utf-8'))
-        sha1.update(str(r_star).encode('utf-8'))
+        sha1.update(m.encode())
+        sha1.update(str(r_star).encode())
         hashed_message = sha1.hexdigest()
         print ("Hash :", int(hashed_message, 16))
 
@@ -190,24 +192,30 @@ def main():
     clientsocket,addr = serversocket.accept()      
 
     print("Got a connection from %s" % str(addr))
-    currentTime = time.ctime(time.time()) + "\r\n"
+    #currentTime = time.ctime(time.time()) + "\r\n"
     #clientsocket.send(currentTime.encode('ascii'))
 
     #Receive public key from client
     PUBKEY_client = clientsocket.recv(4096)
     PUBKEY_client = json.loads(PUBKEY_client)
-    print (PUBKEY_client)
+    print ("\n-------------Public Key received---------------\n")
+
+    pprint.pprint (PUBKEY_client)
 
 
     #Receive signature from the client
     SIGNEDMSG_client = clientsocket.recv(4096)
     SIGNEDMSG_client = json.loads(SIGNEDMSG_client)
-    print (SIGNEDMSG_client)
+    print ("\n-------------Signed message received---------------\n")
 
+    pprint.pprint (SIGNEDMSG_client)
+
+    print ("\n-------------Verification key---------------\n")
 
     alpha_server = PUBKEY_client['alpha']
     y_server = PUBKEY_client['y']
     p_server = PUBKEY_client['p']
+    q_server = PUBKEY_client['q']
 
     s_dash_server = SIGNEDMSG_client['sign_s']
     e_dash_server = SIGNEDMSG_client['sign_e']

@@ -5,6 +5,8 @@ import copy
 import math
 import hashlib
 import json
+import string
+import pprint
 
 
 # create a socket object
@@ -12,14 +14,16 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # get local machine name
 host = socket.gethostname()                           
 
-port = 9977
+port = 9978
 
 # connection to hostname on the port.
-s.connect((host, port))                               
+s.connect((host, port))           
 
 
 ####################### UTILITY FUNCTIONS ############################
 
+def random_string_generator(size=10, chars=string.ascii_letters + string.digits + string.punctuation):
+    return ''.join(random.choice(chars) for _ in range(size))
 
 def power(b, e, m):
     #base case
@@ -119,7 +123,7 @@ class MessageStruct():
         final['alpha'] = alpha;
         final['y'] = y;
 
-        return json.dumps(final);
+        return json.dumps(final, indent =1);
 
     def signed_msg(self, m, e, s):
         final = copy.deepcopy(self.message);
@@ -134,7 +138,7 @@ class MessageStruct():
         final['sign_e'] = e;
         final['sign_s'] = s;
 
-        return json.dumps(final);
+        return json.dumps(final, indent =1);
 
     def verstatus_msg(self, status):
         final = copy.deepcopy(self.message);
@@ -146,7 +150,7 @@ class MessageStruct():
 
         final['ver_status'] = status;
 
-        return json.dumps(final);
+        return json.dumps(final, indent=1);
 
 
 class KeyGenerator:
@@ -172,7 +176,7 @@ class KeyGenerator:
        # print ("k : ", k)
 
         #Select the random integer between [2, n-2]
-        a = 2 + (random.getrandbits(20) % (n-4))
+        a = 2 + (random.getrandbits(20) % (n-1))
 
         #Do miller-rabin
         if (power(a, q, n)==1):
@@ -223,7 +227,11 @@ class KeyGenerator:
         #Find q, the prime divisor of p-1
         #For this, eliminate multiples of 2 first.
 
-        w = p-1
+        w = copy.deepcopy(p-1)
+        '''
+
+        # METHOD 1:
+
         while (1):
             
             if (w%2==0):
@@ -234,19 +242,52 @@ class KeyGenerator:
         gen = int(math.sqrt(w))
         q = 3
 
-        while (gen >= 3):
+        while (gen <= int(math.sqrt(w)) ):
             if (w%gen == 0):
-                q = gen
+                q = copy.deepcopy(gen)
                 break
-            gen-=1
+            gen+=1
 
         print ("q: ", q)
         return q
+        '''
+
+        #METHOD 2:
+        q=3
+        while(1):
+            q = random.randint(2,w)
+
+            #Check divisibility
+            if (w%q != 0 ):
+                continue
+
+            flag_rabin = 1
+            t = 10
+
+            while(t>0):
+                #print (t)
+                if (self.rabin_miller(q)==1):
+                    t-=1
+                    continue
+                else:
+                    flag_rabin = 0 
+                    break
+                #print (t)
+                t-=1
+
+           # print ("out of loop")
+            if (flag_rabin == 1):
+                break
+        
+        print ("q: ", q)
+        return q
+         
+
 
 
     def generate_alpha(self, p, q):
 
-        g = 2 + random.getrandbits(20)%(p-1)
+        g = 2 + (random.getrandbits(20)%(p-2))
 
         alpha = power(g , (p-1)//q , p)
 
@@ -255,7 +296,7 @@ class KeyGenerator:
 
 
     def compute_a_and_y(self, alpha, p, q):
-        a = 1 + random.getrandbits(20)%(q-1)
+        a = 1 + (random.getrandbits(20)%(q-1))
 
         y = power(alpha, a, p)
 
@@ -274,7 +315,7 @@ class KeySignature:
     '''
 
     def generate_k(self, q):
-        k = 1 + random.getrandbits(20)%(q-1)
+        k = 1 + (random.getrandbits(20)%(q-1))
         print ("Random secret integer k : ", k)
         return k
 
@@ -290,12 +331,12 @@ class KeySignature:
     def compute_hash(self, m, r):
         #concat message and r
         concat_m = str(m) + str(r)
-        print ("concat_m: ", concat_m)
+        #print ("concat_m: ", concat_m)
 
         #Get hash
         sha1 = hashlib.sha1()
-        sha1.update(m.encode('utf-8'))
-        sha1.update(str(r).encode('utf-8'))
+        sha1.update(m.encode())
+        sha1.update(str(r).encode())
         hashed_message = sha1.hexdigest()
         print ("Hash :", int(hashed_message, 16))
 
@@ -304,7 +345,7 @@ class KeySignature:
 
     def compute_s(self, a, e, k, q):
         #print (a*int(e)+k)
-        s = power((a*int(e)) + k, 1, q)
+        s = (a*e + k) % q
 
         print("s : ", s)
         return s
@@ -314,8 +355,8 @@ class KeySignature:
 
         while(1):
             #select 2 random secret integers
-            u = 1 + random.getrandbits(20)%(q-1)
-            v = 1 + random.getrandbits(20)%(q-1)
+            u = 1 + random.getrandbits(20)%(q)
+            v = 1 + random.getrandbits(20)%(q)
 
             temp = power(alpha, u, p)
 
@@ -327,9 +368,7 @@ class KeySignature:
             print ("u : ", u)
             print ("v : ", v)
             print ("r' : ", r_dash)
-            return u,v, r_dash
-
-
+            return u, v, r_dash
 
 
 
@@ -346,7 +385,7 @@ def main():
 
     pubkey = MessageStruct()
     PUBKEY = pubkey.pubkey_msg(p, q, alpha, y)
-    s.send(PUBKEY.encode('utf-8'))
+    s.send(PUBKEY.encode())
 
 
     print ("\n-------------Key signature----------------\n")
@@ -356,7 +395,7 @@ def main():
     k = keysign.generate_k(q)
     r = keysign.compute_r(alpha, k, p)
     #Get random message
-    m = str(random.getrandbits(15))
+    m = random_string_generator(size = 10)
     print ("m : ", m)
     e = keysign.compute_hash(m, r)
     s_sign = keysign.compute_s(a, e, k, q)
@@ -365,18 +404,19 @@ def main():
     print ("e-v : ", e-v)
     s_dash = s_sign- u
     print ("s-u : ",s_sign-u )
-    print ("\n-----------------")
 
     #Send signature
     signature = MessageStruct()
     SIGNEDMSG = signature.signed_msg(m, e_dash, s_dash)
-    s.send(SIGNEDMSG.encode('utf-8'))
+    s.send(SIGNEDMSG.encode())
 
 
     # Receive no more than 4096 bytes
     VERSTATUS_server = s.recv(4096)                                     
     VERSTATUS_server = json.loads(VERSTATUS_server)
-    print (VERSTATUS_server)
+    print ("\n-------------Verification received---------------\n")
+
+    pprint.pprint (VERSTATUS_server)
     s.close()
 
    # print("The time got from the server is %s" % tm.decode('ascii'))
