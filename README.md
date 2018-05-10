@@ -33,7 +33,7 @@ verification algorithm. If signature is valid set status as true (1); otherwise 
 1. Compute r* = α^[s'].y^[−e'](mod p).
 2. Check if H(m||r*) = e'? If so, the signature is valid and set status as true (1); otherwise, the the
 signature is invalid and set status as false (0).
-3. B sends the message V ERST AT US(status) with signature verification result to A.
+3. B sends the message VERSTATUS(status) with signature verification result to A.
 ```
 
 ## Usage
